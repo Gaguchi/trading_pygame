@@ -14,12 +14,14 @@ class GameState(Enum):
 
 class Game:
     def __init__(self):
+        print("Starting Game Initialization...")
         self.width = 800
         self.height = 600
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Medieval Merchant")
         self.clock = pygame.time.Clock()
         self.state = GameState.WORLD_MAP
+        print(f"Game state set to {self.state}.")
         
         self.db = DatabaseHandler()  # Initialize DatabaseHandler
         self.merchant = Merchant(self.width // 2, self.height // 2)
@@ -29,12 +31,17 @@ class Game:
         self.selected_settlement = None
         self.destination_settlement = None  # Track where merchant is heading
         self.game_tick = 0
+        print("Game Initialization Complete.")
 
     def generate_settlements(self):
+        print("Generating settlements...")
         settlements = []
+        
         # Generate one main castle
         settlement_id = self.db.insert_settlement("King's Haven", self.width//2, self.height//2, "castle")
+        self.db.populate_settlement_items(settlement_id)  # Add items to settlement
         settlements.append(Settlement(self.width//2, self.height//2, "King's Haven", "castle", id=settlement_id))
+        print(f"Added Settlement: King's Haven with ID {settlement_id}")
         
         # Generate towns and villages
         names = ["Riverwood", "Oakvale", "Millbrook", "Ironforge", "Meadowbrook"]
@@ -43,8 +50,11 @@ class Game:
             y = random.randint(100, self.height - 100)
             settlement_type = "town" if i < 2 else "village"
             settlement_id = self.db.insert_settlement(name, x, y, settlement_type)
+            self.db.populate_settlement_items(settlement_id)  # Add items to settlement
             settlements.append(Settlement(x, y, name, settlement_type, id=settlement_id))
+            print(f"Added Settlement: {name} ({settlement_type}) with ID {settlement_id}")
         
+        print(f"Total settlements generated: {len(settlements)}")
         return settlements
 
     def draw_world(self):
@@ -107,11 +117,12 @@ class Game:
                                 break
                         
                         if clicked_settlement:
-                            # Instead of opening trade menu, set destination
+                            # Set destination and log event
                             self.destination_settlement = clicked_settlement
                             self.merchant.target_x = clicked_settlement.x
                             self.merchant.target_y = clicked_settlement.y
                             self.merchant.arrived_at_settlement = False
+                            print(f"Merchant destination set to Settlement ID {settlement.id}: {settlement.name}")
                         else:
                             # Clear destination if clicking empty space
                             self.destination_settlement = None
@@ -127,39 +138,48 @@ class Game:
         
         if self.state == GameState.WORLD_MAP:
             # Update settlement prices periodically
-            for settlement in self.settlements:
-                settlement.update_prices(self.game_tick)
+            if self.game_tick % 100 == 0:  # Only update prices every 100 ticks
+                for settlement in self.settlements:
+                    settlement.update_prices(self.game_tick)
             
-            # Move merchant and check for arrival
             if self.merchant.move():  # If merchant just arrived
-                if self.destination_settlement:  # Check if we were heading to a settlement
+                if self.destination_settlement:
                     distance = math.sqrt((self.merchant.x - self.destination_settlement.x)**2 + 
                                       (self.merchant.y - self.destination_settlement.y)**2)
                     if distance < self.destination_settlement.size + 5:
+                        print("\n=== Entering Trading Mode ===")
+                        print(f"Current Settlement: {self.destination_settlement.name}")
+                        print(f"Settlement inventory items: {len(self.destination_settlement.get_inventory_items())}")
+                        print(f"Merchant inventory items: {len(self.merchant.get_inventory_items())}")
                         self.state = GameState.TRADING
                         self.current_settlement = self.destination_settlement
                         self.trading_ui.current_category = None
-                        self.destination_settlement = None  # Clear destination
-        elif self.state == GameState.TRADING:
-            # Optionally, update trading UI elements or handle timed events
-            pass
+                        self.destination_settlement = None
 
     def draw(self):
         if self.state == GameState.WORLD_MAP:
             self.draw_world()
         elif self.state == GameState.TRADING:
-            self.draw_world()  # Draw world in background
+            # Draw semi-transparent background
+            s = pygame.Surface((self.width, self.height))
+            s.set_alpha(128)
+            s.fill((0, 0, 0))
+            self.screen.blit(s, (0,0))
+            
+            # Draw trading UI
             self.trading_ui.draw(self.screen, self.current_settlement, self.merchant)
 
         pygame.display.flip()
 
     def run(self):
+        print("Starting game loop...")
         running = True
         while running:
             running = self.handle_events()
             self.update()
             self.draw()
             self.clock.tick(60)
+        print("Game loop has ended.")
 
 if __name__ == "__main__":
     game = Game()

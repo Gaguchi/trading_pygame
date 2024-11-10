@@ -4,6 +4,7 @@ from models.item import Item
 
 class Merchant:
     def __init__(self, x, y):
+        print(f"Initializing Merchant at position ({x}, {y})")
         # Assign the merchant's current position
         self.x = x  # Current x position
         self.y = y  # Current y position
@@ -18,7 +19,8 @@ class Merchant:
         self.load_inventory()
 
     def load_inventory(self):
-        # Initialize merchant's inventory
+        print("Loading merchant inventory...")
+        # Initialize merchant's inventory with zero quantities
         items = Item.load_all_items()
         for item in items:
             self.inventory[item.id] = Item(
@@ -30,9 +32,12 @@ class Merchant:
                 category=item.category,
                 quantity=0  # Start with zero quantity
             )
+        print(f"Merchant inventory initialized with {len(self.inventory)} item types")
 
     def move(self):
         if self.x == self.target_x and self.y == self.target_y:
+            if not self.arrived_at_settlement:
+                print("Merchant has arrived at destination")
             self.arrived_at_settlement = True
             return True
         else:
@@ -42,13 +47,10 @@ class Merchant:
             distance = math.hypot(dx, dy)
             if distance == 0:
                 return True
-            # Normalize the direction
             dx /= distance
             dy /= distance
-            # Update position based on speed
             self.x += dx * self.speed
             self.y += dy * self.speed
-            # Check if arrived
             if math.hypot(self.target_x - self.x, self.target_y - self.y) < self.speed:
                 self.x = self.target_x
                 self.y = self.target_y
@@ -61,10 +63,12 @@ class Merchant:
         pygame.draw.circle(screen, (0, 0, 255), (int(self.x), int(self.y)), 10)
 
     def add_item(self, item_id, quantity):
+        print(f"Merchant adding item ID {item_id} x{quantity}")
         if item_id in self.inventory:
             if self.current_load + quantity <= self.cart_capacity:
                 self.inventory[item_id].quantity += quantity
                 self.current_load += quantity
+                print(f"Added {quantity}x {self.inventory[item_id].name} to merchant's inventory.")
             else:
                 print("Cannot add item: Cart capacity exceeded.")
         else:
@@ -74,15 +78,22 @@ class Merchant:
                     item.quantity = quantity
                     self.inventory[item_id] = item
                     self.current_load += quantity
+                    print(f"Added new item to merchant's inventory: {item.name} x{quantity}")
                 else:
                     print("Cannot add item: Cart capacity exceeded.")
 
     def remove_item(self, item_id, quantity):
+        print(f"Merchant removing item ID {item_id} x{quantity}")
         if item_id in self.inventory:
             if self.inventory[item_id].quantity >= quantity:
+                item_name = self.inventory[item_id].name  # Store name before removal
                 self.inventory[item_id].quantity -= quantity
                 self.current_load -= quantity
+                print(f"Removed {quantity}x {item_name} from merchant's inventory.")
+                
+                # Check if quantity is zero after removal
                 if self.inventory[item_id].quantity == 0:
+                    print(f"{item_name} removed from inventory as quantity is zero.")
                     del self.inventory[item_id]
             else:
                 print("Cannot remove item: Not enough quantity.")
@@ -90,4 +101,5 @@ class Merchant:
             print("Cannot remove item: Item not in inventory.")
 
     def get_inventory_items(self):
-        return list(self.inventory.values())
+        # Return only items with quantity > 0 to avoid empty entries
+        return [item for item in self.inventory.values() if item.quantity > 0]
