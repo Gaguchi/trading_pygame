@@ -3,22 +3,35 @@ import random
 from database.db_handler import DatabaseHandler
 from models.item import Item
 import logging  # Ensure logging is imported
+from handlers.pricing_handler import PricingHandler
 
 class Settlement:
     def __init__(self, x, y, name, settlement_type, id=None):
-        print(f"Initializing Settlement: {name}, Type: {settlement_type}, Location: ({x}, {y}), ID: {id}")
-        self.id = id  # Assign the settlement ID
         self.x = x
         self.y = y
         self.name = name
         self.settlement_type = settlement_type
-        self.size = 20  # Example size for settlement radius
+        self.id = id
+        
+        # Set size based on settlement type
+        if settlement_type == "castle":
+            self.size = 25
+            self.color = (139, 69, 19)  # Brown
+        elif settlement_type == "capital":
+            self.size = 20
+            self.color = (178, 34, 34)  # Firebrick Red
+        elif settlement_type == "town":
+            self.size = 15
+            self.color = (70, 130, 180)  # Steel Blue
+        else:  # village
+            self.size = 10
+            self.color = (34, 139, 34)  # Forest Green
+
         self.inventory = {}  # Inventory as {item_id: Item}
         self.gold = 1000  # Starting gold for settlements
         self.load_inventory()
 
     def load_inventory(self):
-        print(f"\nLoading inventory for Settlement ID {self.id}...")
         db = DatabaseHandler()
         if self.id is not None:
             items_data = db.get_settlement_items(self.id)
@@ -48,10 +61,7 @@ class Settlement:
         # Only log price updates occasionally
         if game_tick % 100 == 0:  # Match the update frequency in game.py
             print(f"Updating prices for {self.name} (ID: {self.id})")
-        for item in self.inventory.values():
-            price_fluctuation = random.uniform(0.9, 1.1)
-            item.buy_price = max(1, int(item.buy_price * price_fluctuation))
-            item.sell_price = max(1, int(item.sell_price * price_fluctuation))
+            PricingHandler.update_settlement_prices(self)
 
     def add_item(self, item_id, quantity):
         print(f"Adding item ID {item_id} x{quantity} to Settlement ID {self.id}")
@@ -87,10 +97,7 @@ class Settlement:
 
     def draw(self, screen):
         # Draw settlement as a circle with different colors based on type
-        if self.settlement_type == "castle":
-            color = (128, 128, 128)  # Grey for castle
-        elif self.settlement_type == "town":
-            color = (0, 0, 255)  # Blue for town
-        else:
-            color = (0, 255, 0)  # Green for village
-        pygame.draw.circle(screen, color, (self.x, self.y), self.size)
+        pygame.draw.circle(screen, self.color, (self.x, self.y), self.size)
+    def draw(self, screen):
+        # Draw settlement as a circle with different colors based on type
+        pygame.draw.circle(screen, self.color, (self.x, self.y), self.size)

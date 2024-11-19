@@ -1,4 +1,3 @@
-
 -- Table for items
 CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -12,7 +11,7 @@ CREATE TABLE IF NOT EXISTS items (
 -- Table for settlements
 CREATE TABLE IF NOT EXISTS settlements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     x INTEGER NOT NULL,
     y INTEGER NOT NULL,
     settlement_type TEXT NOT NULL,

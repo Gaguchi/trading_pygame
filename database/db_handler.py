@@ -12,49 +12,61 @@ class DatabaseHandler:
         print("Connecting to database at:", self.db_path)
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
-
         cursor = self.conn.cursor()
-        # Create items table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                buy_price INTEGER NOT NULL,
-                sell_price INTEGER NOT NULL,
-                description TEXT,
-                category TEXT
-            )
-        ''')
-        print("Ensured 'items' table exists.")
 
-        # Create settlements table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS settlements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                x INTEGER NOT NULL,
-                y INTEGER NOT NULL,
-                settlement_type TEXT NOT NULL,
-                base_price_modifier REAL DEFAULT 1.0
-            )
-        ''')
-        print("Ensured 'settlements' table exists.")
+        # Execute schema.sql to create tables
+        try:
+            with open('database/schema.sql', 'r') as schema_file:
+                schema_script = schema_file.read()
+                cursor.executescript(schema_script)
+                self.conn.commit()
+                print("Database schema initialized successfully")
+        except Exception as e:
+            print(f"Error initializing database schema: {e}")
+            self.conn.rollback()
 
-        # Create settlement_items table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS settlement_items (
-                settlement_id INTEGER,
-                item_id INTEGER,
-                quantity INTEGER NOT NULL,
-                FOREIGN KEY(settlement_id) REFERENCES settlements(id),
-                FOREIGN KEY(item_id) REFERENCES items(id),
-                PRIMARY KEY (settlement_id, item_id)
-            )
-        ''')
-        print("Ensured 'settlement_items' table exists.")
+        # Check if settlements need to be initialized
+        cursor.execute('SELECT COUNT(*) FROM settlements')
+        if cursor.fetchone()[0] == 0:
+            print("Initializing settlements from SQL file...")
+            try:
+                with open('database/init_settlements.sql', 'r') as sql_file:
+                    sql_script = sql_file.read()
+                    cursor.executescript(sql_script)
+                    self.conn.commit()
+                    print("Settlements initialized successfully")
+            except Exception as e:
+                print(f"Error initializing settlements: {e}")
+                self.conn.rollback()
 
-        self.conn.commit()
-        print("Database tables initialized.")
+        # Check if items need to be initialized
+        cursor.execute('SELECT COUNT(*) FROM items')
+        if cursor.fetchone()[0] == 0:
+            print("Initializing items from SQL file...")
+            try:
+                with open('database/init_items.sql', 'r') as sql_file:
+                    sql_script = sql_file.read()
+                    cursor.executescript(sql_script)
+                    self.conn.commit()
+                    print("Items initialized successfully")
+            except Exception as e:
+                print(f"Error initializing items: {e}")
+                self.conn.rollback()
+
+        # Populate settlement items
+        cursor.execute('SELECT COUNT(*) FROM settlement_items')
+        if cursor.fetchone()[0] == 0:
+            print("Populating settlement items...")
+            try:
+                settlements = self.load_settlements()
+                for settlement in settlements:
+                    self.populate_settlement_items(settlement['id'])
+                print("Settlement items populated successfully")
+            except Exception as e:
+                print(f"Error populating settlement items: {e}")
+                self.conn.rollback()
+
+        print("Database initialization complete")
 
     def get_items(self):
         print("Fetching all items from the database...")
@@ -161,3 +173,34 @@ class DatabaseHandler:
         except Exception as e:
             print(f"Error populating items for settlement {settlement_id}: {e}")
             self.conn.rollback()
+
+    def get_settlement_id_by_name(self, name):
+        """Get settlement ID by name, returns None if not found."""
+        try:
+            self.cursor.execute("SELECT id FROM settlements WHERE name = ?", (name,))
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return None
+
+    def load_settlements(self):
+        """Load all settlements from database."""
+        print("Loading settlements from database...")
+        cursor = self.conn.cursor()
+        
+        # Get settlement counts by type
+        cursor.execute('''
+            SELECT settlement_type, COUNT(*) 
+            FROM settlements 
+            GROUP BY settlement_type
+        ''')
+        counts = cursor.fetchall()
+        for type_count in counts:
+            print(f"Found {type_count[1]} {type_count[0]}(s)")
+
+        # Get all settlements
+        cursor.execute('SELECT * FROM settlements ORDER BY settlement_type, name')
+        settlements = cursor.fetchall()
+        print(f"Loaded {len(settlements)} total settlements")
+        return settlements

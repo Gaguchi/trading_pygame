@@ -58,9 +58,9 @@ class Merchant:
                 return True
             return False
 
-    def draw(self, screen):
-        # Draw merchant as a blue circle
-        pygame.draw.circle(screen, (0, 0, 255), (int(self.x), int(self.y)), 10)
+    def draw(self, screen, screen_pos):
+        # Modified draw method to accept screen position
+        pygame.draw.circle(screen, (255, 0, 0), screen_pos, 10)
 
     def add_item(self, item_id, quantity):
         print(f"Merchant adding item ID {item_id} x{quantity}")
